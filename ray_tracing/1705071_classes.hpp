@@ -1,5 +1,5 @@
-
 #define infinity 9999999999.0
+#define move_forward_const 0.000001
 
 class Object;
 class PointLight;
@@ -144,7 +144,7 @@ public:
     {
         point shadow_point = add_points(light_pos, multiply_point(multiply_point(light_dir,-1.0),t_min_light));
 
-        if(get_distance(intersection_point,light_pos)-0.000001 > get_distance(shadow_point,light_pos)) return true;
+        if(get_distance(intersection_point,light_pos)-move_forward_const > get_distance(shadow_point,light_pos)) return true;
         return false;
     }
 };
@@ -168,7 +168,7 @@ double Object :: intersect(Ray& r, vector<double>& color, int level)
 
     point normal = this->get_normal(intersection_point);
 
-    if(dot_multiply_points(normal,multiply_point(ray_dir,-1.0))<=0.0)
+    if(dot_multiply_points(normal,multiply_point(ray_dir,-1.0)) < 0.0)
     {
         normal = multiply_point(normal,-1.0);
     }
@@ -180,7 +180,7 @@ double Object :: intersect(Ray& r, vector<double>& color, int level)
         ///cout<<"in point lighting"<<endl;
         point pntlight_pos = pointlights[i]->getPosition(), pntlight_dir = subtract_points(pntlight_pos, intersection_point);
         pntlight_dir = normalize(pntlight_dir);
-        pntlight_pos = add_points(pntlight_pos,multiply_point(pntlight_dir, 0.000001)); ///slightly move forward
+        pntlight_pos = add_points(pntlight_pos,multiply_point(pntlight_dir, move_forward_const)); ///slightly move forward
 
         Ray pntlight_ray(pntlight_pos, multiply_point(pntlight_dir, -1.0));
 
@@ -203,13 +203,13 @@ double Object :: intersect(Ray& r, vector<double>& color, int level)
 
         if(t_min_light == infinity || in_shadow) continue;
 
-        double lmbrt_val = max(dot_multiply_points(normal, multiply_point(pntlight_dir,1.0)), 0.0);
+        double lmbrt_val = max(dot_multiply_points(normal, pntlight_dir), 0.0);
 
         color[0] += (pointlights[i]->getColor()[0] * getCoefficients()[1] * lmbrt_val * this->getColor_at_point(intersection_point)[0]);
         color[1] += (pointlights[i]->getColor()[1] * getCoefficients()[1] * lmbrt_val * this->getColor_at_point(intersection_point)[1]);
         color[2] += (pointlights[i]->getColor()[2] * getCoefficients()[1] * lmbrt_val * this->getColor_at_point(intersection_point)[2]);
 
-        point light_ray_refl = subtract_points(multiply_point(normal, 2.0*dot_multiply_points(normal,pntlight_dir)), intersection_point);
+        point light_ray_refl = subtract_points(pntlight_ray.get_ray_dir(), multiply_point(normal, 2.0*dot_multiply_points(normal,pntlight_ray.get_ray_dir())));
         light_ray_refl = normalize(light_ray_refl);
 
         double phong_val = max(pow(dot_multiply_points(light_ray_refl,multiply_point(ray_dir,-1.0)),getShine()),0.0);
@@ -226,12 +226,8 @@ double Object :: intersect(Ray& r, vector<double>& color, int level)
     for(int i = 0; i < spotlights.size(); i++)
     {
         ///cout<<"in spot lighting"<<endl;
-        point sptlight_pos = spotlights[i]->getPointlight()->getPosition(), sptlight_dir = multiply_point(spotlights[i]->getLightDirection(),1.0);
-
-        sptlight_pos = add_points(sptlight_pos,multiply_point(sptlight_dir, 0.000001)); ///slightly move forward
-        //sptlight_pos = multiply_point(sptlight_pos,-1.0);
-
-        Ray sptlight_ray(sptlight_pos, multiply_point(sptlight_dir,-1.0));
+        point sptlight_pos = spotlights[i]->getPointlight()->getPosition(), sptlight_dir =spotlights[i]->getLightDirection();
+        sptlight_pos = add_points(sptlight_pos,multiply_point(sptlight_dir, move_forward_const)); ///slightly move forward
 
         /// check angle
         point pos_to_point = subtract_points(intersection_point,sptlight_pos);
@@ -244,7 +240,9 @@ double Object :: intersect(Ray& r, vector<double>& color, int level)
         double angle = acos(dot_product/sqrt(det1 * det2)) * 180.0 / pi;
         ///cout<<angle<<endl;
         if(angle > spotlights[i]->getCutoffAngle()) continue;
-        ///else{cout<<"ok1"<<endl;}
+
+
+        Ray sptlight_ray(sptlight_pos, pos_to_point);
 
         /// check if is in shadow
 
@@ -261,16 +259,20 @@ double Object :: intersect(Ray& r, vector<double>& color, int level)
             }
         }
 
-        if(t_min > t_min_light) continue; /// obstructed by another object
+        bool in_shadow = check_if_in_shadow(sptlight_pos, multiply_point(sptlight_ray.get_ray_dir(), -1.0), intersection_point, t_min_light);
 
-        double lmbrt_val = max(dot_multiply_points(normal, multiply_point(sptlight_dir,-1.0)), 0.0);
+        if(t_min_light == infinity || in_shadow) continue;
 
-        point light_ray_refl = subtract_points(multiply_point(normal, 2.0*dot_multiply_points(normal,sptlight_dir)), sptlight_dir);
+        point actual_dir = multiply_point(sptlight_ray.get_ray_dir(),-1.0);
+        double lmbrt_val = max(dot_multiply_points(normal, actual_dir) , 0.0);
+
+        point light_ray_refl = subtract_points(sptlight_ray.get_ray_dir(), multiply_point(normal, 2.0*dot_multiply_points(normal,sptlight_ray.get_ray_dir())));
         light_ray_refl = normalize(light_ray_refl);
 
-        double phong_val = max(pow(dot_multiply_points(light_ray_refl,multiply_point(ray_dir,1.0)),getShine()),0.0);
+        double phong_val = max(pow(dot_multiply_points(light_ray_refl,multiply_point(ray_dir,-1.0)),getShine()),0.0);
 
         ///cout<<lmbrt_val<<" lmbrt"<<endl;
+
         color[0] += (spotlights[i]->getPointlight()->getColor()[0] * getCoefficients()[1] * lmbrt_val * this->getColor_at_point(intersection_point)[0]);
         color[1] += (spotlights[i]->getPointlight()->getColor()[1] * getCoefficients()[1] * lmbrt_val * this->getColor_at_point(intersection_point)[1]);
         color[2] += (spotlights[i]->getPointlight()->getColor()[2] * getCoefficients()[1] * lmbrt_val * this->getColor_at_point(intersection_point)[2]);
@@ -291,13 +293,11 @@ double Object :: intersect(Ray& r, vector<double>& color, int level)
 
     ///cout<<"ref "<<refl_dir.x<<" "<<refl_dir.y<<" "<<refl_dir.z<<endl;
 
-    Ray refl_ray(add_points(intersection_point, multiply_point(refl_dir, 0.0000001)), refl_dir);
+    Ray refl_ray(add_points(intersection_point, multiply_point(refl_dir, move_forward_const)), refl_dir);
 
     /// t_min from nearest reflecting object
     int nearest = -1;
     double t_refl, t_min_refl = infinity;
-
-    ///cout<<"nearest intersect"<<endl;
 
     vector<double> color_temp;
 
@@ -318,8 +318,8 @@ double Object :: intersect(Ray& r, vector<double>& color, int level)
         color[0] += color_temp[0] * getCoefficients()[3];
         color[1] += color_temp[1] * getCoefficients()[3];
         color[2] += color_temp[2] * getCoefficients()[3];
-        color = clip_color(color);
     }
+    color = clip_color(color);
 
     ///cout<<"color "<<color[0]<<" "<<color[1]<<" "<<color[2]<<endl;
 
