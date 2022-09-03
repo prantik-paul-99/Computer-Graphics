@@ -68,7 +68,11 @@ public:
 
     void draw()
     {
-        drawSphere(point_light->getPosition(), 1, point_light->getColor());
+        drawSphere(point_light->getPosition(), 1.5, point_light->getColor());
+    }
+    delete_pointlight()
+    {
+        delete this->point_light;
     }
 };
 
@@ -94,10 +98,10 @@ public:
 
     Object() = default;
 
-    virtual void draw(){}
     double intersect(Ray& r, vector<double>& color, int level);
-    virtual double get_intersect_param(Ray& r, vector<double>& color, int level){return -1.0;}
 
+    virtual void draw(){}
+    virtual double get_intersect_param(Ray& r, vector<double>& color, int level){return -1.0;}
     virtual point get_normal(point a){point n; return n;}
     virtual vector<double> getColor_at_point(point a){vector<double> temp; return temp;}
 
@@ -135,7 +139,6 @@ public:
     double getLength() {return length;}
     double getWidth() {return width;}
     double getHeight() {return height;}
-
     vector<double> getColor() {return color;}
     vector<double> getCoefficients() {return coefficients;}
     int getShine() {return shine;}
@@ -157,15 +160,7 @@ double Object :: intersect(Ray& r, vector<double>& color, int level)
 
     point ray_start = r.get_ray_start(), ray_dir = r.get_ray_dir();
 
-    ///ambient coefficient work
-
     point intersection_point = add_points(ray_start, multiply_point(ray_dir, t_min));
-    color = this->getColor_at_point(intersection_point);
-
-    color[0] = color[0] * getCoefficients()[0];
-    color[1] = color[1] * getCoefficients()[0];
-    color[2] = color[2] * getCoefficients()[0];
-
     point normal = this->get_normal(intersection_point);
 
     if(dot_multiply_points(normal,multiply_point(ray_dir,-1.0)) < 0.0)
@@ -173,11 +168,20 @@ double Object :: intersect(Ray& r, vector<double>& color, int level)
         normal = multiply_point(normal,-1.0);
     }
 
+    ///ambient coefficient work
+
+    color = this->getColor_at_point(intersection_point);
+
+    color[0] = color[0] * getCoefficients()[0];
+    color[1] = color[1] * getCoefficients()[0];
+    color[2] = color[2] * getCoefficients()[0];
+
     /// lighting for pointlights
 
     for(int i = 0; i < pointlights.size(); i++)
     {
         ///cout<<"in point lighting"<<endl;
+
         point pntlight_pos = pointlights[i]->getPosition(), pntlight_dir = subtract_points(pntlight_pos, intersection_point);
         pntlight_dir = normalize(pntlight_dir);
         pntlight_pos = add_points(pntlight_pos,multiply_point(pntlight_dir, move_forward_const)); ///slightly move forward
@@ -586,6 +590,8 @@ public:
         a = general_quad_coefficients[0]*pow(ray_dir.x,2.0) + general_quad_coefficients[1]*pow(ray_dir.y,2.0) + general_quad_coefficients[2]*pow(ray_dir.z,2.0) + general_quad_coefficients[3]*ray_dir.x*ray_dir.y + general_quad_coefficients[4]*ray_dir.x*ray_dir.z + general_quad_coefficients[5]*ray_dir.y*ray_dir.z;
         b = general_quad_coefficients[0]*ray_start.x*ray_dir.x*2.0 + general_quad_coefficients[1]*ray_start.y*ray_dir.y*2.0 + general_quad_coefficients[2]*ray_start.z*ray_dir.z*2.0 + general_quad_coefficients[3]*(ray_dir.x*ray_start.y+ray_dir.y*ray_start.x) + general_quad_coefficients[4]*(ray_dir.x*ray_start.z+ray_dir.z*ray_start.x) + general_quad_coefficients[5]*(ray_dir.y*ray_start.z+ray_dir.z*ray_start.y) + general_quad_coefficients[6]*ray_dir.x + general_quad_coefficients[7]*ray_dir.y + general_quad_coefficients[8]*ray_dir.z;
         c = general_quad_coefficients[0]*pow(ray_start.x,2.0) + general_quad_coefficients[1]*pow(ray_start.y,2.0) + general_quad_coefficients[2]*pow(ray_start.z,2.0) + general_quad_coefficients[3]*ray_start.x*ray_start.y + general_quad_coefficients[4]*ray_start.x*ray_start.z + general_quad_coefficients[5]*ray_start.y*ray_start.z + general_quad_coefficients[6]*ray_start.x + general_quad_coefficients[7]*ray_start.y + general_quad_coefficients[8]*ray_start.z + general_quad_coefficients[9];
+
+        if(a == 0.0) return infinity;
 
         val = pow(b,2.0) - 4*a*c;
 

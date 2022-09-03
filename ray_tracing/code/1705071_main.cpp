@@ -7,9 +7,10 @@
 
 using namespace std;
 
-#include "1705071.hpp"
+#include "1705071_point_functions.hpp"
+#include "1705071_draw.hpp"
 #include "1705071_classes.hpp"
-#include "bitmap_image.hpp"
+#include "1705071_bitmap_image.hpp"
 
 double fovy = 80.0, aspect = 1.0, znear = 1.0, zfar = 1000.0;
 
@@ -36,6 +37,10 @@ void loadData()
     }
 
     infile >> rec_lvl >> scrn_sz >> obj_num;
+
+    color.push_back(0);
+    color.push_back(0);
+    color.push_back(0);
 
     for (int cnt = 0; cnt < obj_num; cnt++)
     {
@@ -82,12 +87,11 @@ void loadData()
 
         }
 
-        color.clear();
         for(int i = 0; i < 3; i++)
         {
             double val;
             infile >> val;
-            color.push_back(val);
+            color[i] = val;
         }
         temp->setColor(color);
 
@@ -115,14 +119,13 @@ void loadData()
     for(int cnt = 0; cnt < pointlight_cnt; cnt++)
     {
         point pos;
-        color.clear();
 
         infile >> pos.x >> pos.y >> pos.z;
         for(int i = 0; i < 3; i++)
         {
             double val;
             infile >> val;
-            color.push_back(val);
+            color[i] = val;
         }
 
         temp_pntlight = new PointLight(pos, color);
@@ -157,20 +160,24 @@ void loadData()
 
     /// creating floor
 
-    color.clear();
-    color.push_back(0);
-    color.push_back(0);
-    color.push_back(0);
+    color[0] = 0;
+    color[1] = 0;
+    color[2] = 0;
 
     Object* temp = new Floor(1000,20);
     temp->setColor(color);
     vector<double> coeffs;
+//    coeffs.push_back(0.1);
+//    coeffs.push_back(0.8);
+//    coeffs.push_back(0.5);
+//    coeffs.push_back(0.1);
+
+    coeffs.push_back(0.3);
     coeffs.push_back(0.25);
     coeffs.push_back(0.25);
-    coeffs.push_back(0.25);
-    coeffs.push_back(0.25);
+    coeffs.push_back(0.3);
     temp->setCoefficients(coeffs);
-    temp->setShine(15);
+    temp->setShine(10);
 
     objects.push_back(temp);
 
@@ -195,10 +202,13 @@ void capture()
     point top_lft;
 
     plane_dist = (wind_sz/2.0)/(tan((fovy/2.0)*pi/180.0));
+
     point temp = subtract_points(multiply_point(u, wind_sz/2.0), multiply_point(r, wind_sz/2.0));
     temp = add_points(multiply_point(l, plane_dist), temp);
     top_lft = add_points(pos, temp);
+
     du = dv = ((double) wind_sz/scrn_sz);
+
     temp = subtract_points(multiply_point(r,du/2.0), multiply_point(u,dv/2.0));
     top_lft = add_points(top_lft,temp);
 
@@ -218,10 +228,9 @@ void capture()
 
             for(int k = 0; k < objects.size(); k++)
             {
-                color.clear();
-                color.push_back(0);
-                color.push_back(0);
-                color.push_back(0);
+                    color[0] = 0;
+                    color[1] = 0;
+                    color[2] = 0;
 
                 t = objects[k]->intersect(ray, color, 0);
 
@@ -251,6 +260,25 @@ void capture()
     img.save_image("E:\\Ondrive\\OneDrive - BUET\\study\\4-1\\CSE 410\\Ray Tracing\\ray_tracing2\\Output_1"+img_count_str.str()+".bmp");
 }
 
+void clear_memory()
+{
+    for(int i = 0; i < objects.size(); i++)
+    {
+        delete objects[i];
+    }
+    for(int i = 0; i < pointlights.size(); i++)
+    {
+        delete pointlights[i];
+    }
+    for(int i = 0; i < spotlights.size(); i++)
+    {
+        spotlights[i]->delete_pointlight();
+        delete spotlights[i];
+    }
+    vector<Object*>().swap(objects);
+    vector<PointLight*>().swap(pointlights);
+    vector<SpotLight*>().swap(spotlights);
+}
 
 
 void drawSS()
@@ -302,6 +330,11 @@ void keyboardListener(unsigned char key, int x,int y){
             u = rotate_a_wrt_b(u,l,-1);
             r = rotate_a_wrt_b(r,l,-1);
 			break;
+        case 'q':
+            clear_memory();
+            cout<<"memory freed"<<endl;
+            exit(0);
+
 		default:
 			break;
 	}
@@ -329,6 +362,7 @@ void specialKeyListener(int key, int x,int y){
 			break;
 
 		case GLUT_KEY_INSERT:
+		    exit(0);
 			break;
 
 		default:
@@ -339,8 +373,7 @@ void specialKeyListener(int key, int x,int y){
 void mouseListener(int button, int state, int x, int y){	//x, y is the x-y of the screen (2D)
 	switch(button){
 		case GLUT_LEFT_BUTTON:
-			if(state == GLUT_DOWN){		// 2 times?? in ONE click? -- solution is checking DOWN or UP
-				drawaxes=1-drawaxes;
+			if(state == GLUT_DOWN){
 			}
 			break;
 
@@ -397,9 +430,6 @@ void animate(){
 }
 
 void init(){
-	//codes for initialization
-	drawgrid=0;
-	drawaxes=0;
 	/// camera control initialize ///
 	pos.x = 100;
     pos.y = 100;
@@ -447,6 +477,8 @@ int main(int argc, char **argv){
 	glutMouseFunc(mouseListener);
 
 	glutMainLoop();		//The main loop of OpenGL
+
+	clear_memory();
 
 	return 0;
 }
